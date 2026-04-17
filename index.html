@@ -81,6 +81,18 @@
     transition: all .15s; }
   .diff-btn:hover  { border-color: #90a4ae; color: #90a4ae; }
   .diff-btn.active { border-color: #ffd54f; color: #ffd54f; background: rgba(255,213,79,.08); }
+
+  /* Cheat buttons — hidden in corners of start screen */
+  .cheat-btn { position: absolute; bottom: 16px; padding: 5px 11px;
+    font-size: 10px; font-family: inherit; letter-spacing: 1px;
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 5px; cursor: pointer;
+    background: transparent; color: rgba(255,255,255,0.13); transition: all .2s;
+    user-select: none; }
+  .cheat-btn:hover { color: rgba(255,255,255,0.4); border-color: rgba(255,255,255,0.22); }
+  .cheat-btn.active { color: #ffd54f; border-color: #ffd54f; background: rgba(255,213,79,.1);
+    text-shadow: 0 0 8px rgba(255,213,79,.6); }
+  #cheat-p1 { left: 16px; }
+  #cheat-p2 { right: 16px; }
 </style>
 </head>
 <body>
@@ -136,6 +148,8 @@
     </div>
   </div>
   <div class="start-hint">P1: WASD + SPACE &nbsp;|&nbsp; P2: ARROWS+ENTER or JKLI+O &nbsp;|&nbsp; First to 3 rounds wins!</div>
+  <button class="cheat-btn" id="cheat-p1">P1 ∞</button>
+  <button class="cheat-btn" id="cheat-p2">P2 ∞</button>
 </div>
 
 <script>
@@ -325,11 +339,11 @@ function makePreview(mapDef) {
   c.width  = 148; c.height = 99;
   c.style.display = 'block';
   const cx = c.getContext('2d');
-  const sx = 200/W, sy = 115/H;
-  cx.fillStyle = '#263238'; cx.fillRect(0,0,200,115);
+  const sx = 148/W, sy = 99/H;
+  cx.fillStyle = '#263238'; cx.fillRect(0,0,148,99);
   cx.strokeStyle = 'rgba(255,255,255,0.04)'; cx.lineWidth = 0.5;
-  for (let x=0; x<200; x+=WS*sx){ cx.beginPath(); cx.moveTo(x,0); cx.lineTo(x,115); cx.stroke(); }
-  for (let y=0; y<115; y+=WS*sy){ cx.beginPath(); cx.moveTo(0,y); cx.lineTo(200,y); cx.stroke(); }
+  for (let x=0; x<148; x+=WS*sx){ cx.beginPath(); cx.moveTo(x,0); cx.lineTo(x,99); cx.stroke(); }
+  for (let y=0; y<99;  y+=WS*sy){ cx.beginPath(); cx.moveTo(0,y); cx.lineTo(148,y); cx.stroke(); }
   try {
     for (const wl of mapDef.gen()) {
       const wx=wl.x*sx, wy=wl.y*sy, ww=WS*sx, wh=WS*sy;
@@ -388,6 +402,19 @@ let aiDiff = 'medium';
   });
 });
 
+// ─── Cheat buttons ───────────────────────────────────────────
+let p1Cheat = false, p2Cheat = false;
+document.getElementById('cheat-p1').addEventListener('click', () => {
+  p1Cheat = !p1Cheat;
+  document.getElementById('cheat-p1').classList.toggle('active', p1Cheat);
+  document.getElementById('cheat-p1').textContent = p1Cheat ? 'P1 ✦♥▶⚡◎' : 'P1 ∞';
+});
+document.getElementById('cheat-p2').addEventListener('click', () => {
+  p2Cheat = !p2Cheat;
+  document.getElementById('cheat-p2').classList.toggle('active', p2Cheat);
+  document.getElementById('cheat-p2').textContent = p2Cheat ? 'P2 ✦♥▶⚡◎' : 'P2 ∞';
+});
+
 // ─── State ───────────────────────────────────────────────────
 let keys = {};
 let bullets=[], walls=[], particles=[], powerups=[];
@@ -439,6 +466,9 @@ function resetRound() {
   roundOver = false;
   gameStarted = true;
   resetAI();
+  // Apply cheats — Infinity keeps powerups from ever ticking down
+  if (p1Cheat) { p1.multishot=Infinity; p1.speedBoost=Infinity; p1.rapidfire=Infinity; p1.aimbot=Infinity; }
+  if (p2Cheat) { p2.multishot=Infinity; p2.speedBoost=Infinity; p2.rapidfire=Infinity; p2.aimbot=Infinity; }
   updateUI();
 }
 
