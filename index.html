@@ -156,8 +156,8 @@ const SOLID = 'solid';
 const GLASS = 'glass';
 const HEDGE = 'hedge';
 
-const PU_MULTI = 'multi', PU_HP = 'hp', PU_SPEED = 'speed', PU_RAPID = 'rapid';
-const ALL_PU   = [PU_MULTI, PU_HP, PU_SPEED, PU_RAPID];
+const PU_MULTI = 'multi', PU_HP = 'hp', PU_SPEED = 'speed', PU_RAPID = 'rapid', PU_AIMBOT = 'aimbot';
+const ALL_PU   = [PU_MULTI, PU_HP, PU_SPEED, PU_RAPID, PU_AIMBOT];
 
 // ─── Map definitions ─────────────────────────────────────────
 function mw(col, row, type) {
@@ -312,23 +312,21 @@ function startGame(mapIdx) {
 function makeTank(x, y, color, bColor) {
   return { x, y, angle:0, hp:MAX_HP, color, bColor,
     lastShot:0, hitFlash:0,
-    multishot:false, speedBoost:0, rapidfire:0, activePU:null };
+    multishot:false, speedBoost:0, rapidfire:0, aimbot:0, activePU:null };
 }
 
 // ─── AI state ─────────────────────────────────────────────────
 let aiStrafeDir = 1, aiStrafeTimer = 0;
 let aiHeadX = 0, aiHeadY = 1;   // smoothed heading (prevents jitter)
-let aiStuckPos = {x:0,y:0};
-let aiStuckFrames = 0;
 let aiEscapeAngle = 0, aiEscapeTicks = 0;
+let aiBoxMinX=0, aiBoxMaxX=0, aiBoxMinY=0, aiBoxMaxY=0, aiBoxFrames=0;
 
 function resetAI() {
   aiStrafeDir   = Math.random() > 0.5 ? 1 : -1;
   aiStrafeTimer = 80 + Math.floor(Math.random()*100);
   aiHeadX = 0; aiHeadY = 1;
-  aiStuckPos = { x: 0, y: 0 };
-  aiStuckFrames = 0;
   aiEscapeTicks = 0;
+  aiBoxMinX=aiBoxMaxX=p2.x; aiBoxMinY=aiBoxMaxY=p2.y; aiBoxFrames=0;
 }
 
 // ─── Round reset ──────────────────────────────────────────────
@@ -371,9 +369,9 @@ function updateUI() {
   }
 }
 
-function puLabel(t){ return {[PU_MULTI]:'MULTI-SHOT',[PU_HP]:'+1 HP',[PU_SPEED]:'SPEED BOOST',[PU_RAPID]:'RAPID FIRE'}[t]||''; }
-function puColor(t){ return {[PU_MULTI]:'#ffd54f',[PU_HP]:'#66bb6a',[PU_SPEED]:'#ce93d8',[PU_RAPID]:'#ff8a65'}[t]||'#fff'; }
-function puIcon(t) { return {[PU_MULTI]:'✦',[PU_HP]:'♥',[PU_SPEED]:'▶',[PU_RAPID]:'⚡'}[t]||'★'; }
+function puLabel(t){ return {[PU_MULTI]:'MULTI-SHOT',[PU_HP]:'+1 HP',[PU_SPEED]:'SPEED BOOST',[PU_RAPID]:'RAPID FIRE',[PU_AIMBOT]:'AIMBOT'}[t]||''; }
+function puColor(t){ return {[PU_MULTI]:'#ffd54f',[PU_HP]:'#66bb6a',[PU_SPEED]:'#ce93d8',[PU_RAPID]:'#ff8a65',[PU_AIMBOT]:'#ea80fc'}[t]||'#fff'; }
+function puIcon(t) { return {[PU_MULTI]:'✦',[PU_HP]:'♥',[PU_SPEED]:'▶',[PU_RAPID]:'⚡',[PU_AIMBOT]:'◎'}[t]||'★'; }
 
 // ─── Powerups ─────────────────────────────────────────────────
 function spawnPowerup() {
@@ -398,6 +396,8 @@ function collectPowerup(tank, pu) {
     tank.speedBoost=540; tank.activePU=PU_SPEED;
   } else if (pu.type===PU_RAPID) {
     tank.rapidfire=540; tank.activePU=PU_RAPID;
+  } else if (pu.type===PU_AIMBOT) {
+    tank.aimbot=600; tank.activePU=PU_AIMBOT;
   }
   updateUI();
 }
@@ -489,11 +489,11 @@ function updateAI(now) {
   if (Math.abs(aimErr)<cfg.aimTol && dist<640 && hasLOS(ai,player))
     if (Math.random()>cfg.hesitate) tryShoot(ai,now);
 
-  // ── Stuck detection: sample every 30 frames ──
-  if (++aiStuckFrames >= 30) {
-    const moved = Math.hypot(ai.x-aiStuckPos.x, ai.y-aiStuckPos.y);
-    if (moved < 10 && aiEscapeTicks <= 0) {
-      // Pick best escape direction
+  // ── Stuck detection: bounding box over 240 frames (~4 sec at 60fps) ──
+  aiBoxMinX=Math.min(aiBoxMinX,ai.x); aiBoxMaxX=Math.max(aiBoxMaxX,ai.x);
+  aiBoxMinY=Math.min(aiBoxMinY,ai.y); aiBoxMaxY=Math.max(aiBoxMaxY,ai.y);
+  if (++aiBoxFrames >= 240) {
+    if ((aiBoxMaxX-aiBoxMinX)<120 && (aiBoxMaxY-aiBoxMinY)<120 && aiEscapeTicks<=0) {
       let bestA=Math.random()*Math.PI*2, bestOpen=-1;
       for (let i=0;i<8;i++) {
         const a=(i/8)*Math.PI*2; let open=0;
@@ -503,9 +503,9 @@ function updateAI(now) {
         }
         if (open>bestOpen){bestOpen=open;bestA=a;}
       }
-      aiEscapeAngle=bestA; aiEscapeTicks=70;
+      aiEscapeAngle=bestA; aiEscapeTicks=90;
     }
-    aiStuckPos={x:ai.x,y:ai.y}; aiStuckFrames=0;
+    aiBoxMinX=aiBoxMaxX=ai.x; aiBoxMinY=aiBoxMaxY=ai.y; aiBoxFrames=0;
   }
 
   // ── Detect incoming bullets ──
@@ -524,6 +524,7 @@ function updateAI(now) {
     let s=Math.hypot(ai.x-pu.x,ai.y-pu.y);
     if (pu.type===PU_HP&&ai.hp<=3) s*=0.3;
     if (pu.type===PU_MULTI||pu.type===PU_RAPID) s*=0.65;
+    if (pu.type===PU_AIMBOT) s*=0.5;
     if (s<bestPUScore){bestPUScore=s;bestPU=pu;}
   }
 
@@ -592,6 +593,11 @@ function tryShoot(tank, now) {
   const cd = tank.rapidfire>0 ? SHOOT_CD/3.5 : SHOOT_CD;
   if (now-tank.lastShot<cd) return;
   tank.lastShot=now;
+  let fireAngle = tank.angle;
+  if (tank.aimbot>0) {
+    const enemy = tank===p1 ? p2 : p1;
+    fireAngle = Math.atan2(enemy.y-tank.y, enemy.x-tank.x);
+  }
   const fire = ang => bullets.push({
     x: tank.x+Math.cos(ang)*(TANK_SIZE+4),
     y: tank.y+Math.sin(ang)*(TANK_SIZE+4),
@@ -599,8 +605,8 @@ function tryShoot(tank, now) {
     vy: Math.sin(ang)*BULLET_SPEED,
     owner: tank, color: tank.bColor
   });
-  fire(tank.angle);
-  if (tank.multishot){ fire(tank.angle-0.22); fire(tank.angle+0.22); }
+  fire(fireAngle);
+  if (tank.multishot){ fire(fireAngle-0.22); fire(fireAngle+0.22); }
 }
 
 // ─── Update ───────────────────────────────────────────────────
@@ -687,8 +693,9 @@ function update(now) {
   const tickBuff=(tank,field,puType)=>{
     if(tank[field]>0){tank[field]--;if(tank[field]===0){if(tank.activePU===puType)tank.activePU=null;updateUI();}}
   };
-  tickBuff(p1,'speedBoost',PU_SPEED); tickBuff(p2,'speedBoost',PU_SPEED);
-  tickBuff(p1,'rapidfire', PU_RAPID); tickBuff(p2,'rapidfire', PU_RAPID);
+  tickBuff(p1,'speedBoost',PU_SPEED);  tickBuff(p2,'speedBoost',PU_SPEED);
+  tickBuff(p1,'rapidfire', PU_RAPID);  tickBuff(p2,'rapidfire', PU_RAPID);
+  tickBuff(p1,'aimbot',    PU_AIMBOT); tickBuff(p2,'aimbot',    PU_AIMBOT);
 
   for(let i=particles.length-1;i>=0;i--){
     const p=particles[i];
@@ -737,6 +744,7 @@ function drawTank(tank) {
   }
   if(tank.speedBoost>0){ctx.shadowColor='#ce93d8';ctx.shadowBlur=14;}
   if(tank.rapidfire>0) {ctx.shadowColor='#ff8a65';ctx.shadowBlur=14;}
+  if(tank.aimbot>0)    {ctx.shadowColor='#ea80fc';ctx.shadowBlur=18;}
   ctx.fillStyle=tank.color;
   ctx.beginPath();ctx.roundRect(-TANK_SIZE,-TANK_SIZE*.75,TANK_SIZE*2,TANK_SIZE*1.5,5);ctx.fill();
   ctx.shadowBlur=0;
