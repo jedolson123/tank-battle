@@ -93,9 +93,9 @@
   </div>
   <div class="score" id="score">0 — 0</div>
   <div class="player-ui" style="align-items:flex-end">
-    <div class="player-label" id="p2-label" style="color:#ef5350">P2 — ARROWS + ENTER</div>
+    <div class="player-label" id="p2-label" style="color:#ef5350">P2 — ARROWS / JKLI</div>
     <div class="health-bar-bg"><div class="health-bar" id="p2-bar" style="width:100%"></div></div>
-    <div class="status-hint" id="p2-status">Move: ↑↓←→ &nbsp; Shoot: ENTER</div>
+    <div class="status-hint" id="p2-status">Move: ↑↓←→ / JKLI &nbsp; Shoot: ENTER/O</div>
   </div>
 </div>
 
@@ -135,7 +135,7 @@
       <div class="legend-box" style="background:#388e3c"></div> Hedge — tanks pass
     </div>
   </div>
-  <div class="start-hint">P1: WASD + SPACE &nbsp;|&nbsp; P2: ARROWS + ENTER &nbsp;|&nbsp; First to 3 rounds wins!</div>
+  <div class="start-hint">P1: WASD + SPACE &nbsp;|&nbsp; P2: ARROWS+ENTER or JKLI+O &nbsp;|&nbsp; First to 3 rounds wins!</div>
 </div>
 
 <script>
@@ -147,6 +147,7 @@ const W = canvas.width, H = canvas.height;
 const TANK_SIZE    = 20;
 const TANK_SPEED   = 2.8;
 const BULLET_SPEED = 6;
+const BULLET_R     = 7;
 const SHOOT_CD     = 500;
 const MAX_HP       = 5;
 const WS           = 40;
@@ -312,7 +313,7 @@ function startGame(mapIdx) {
 function makeTank(x, y, color, bColor) {
   return { x, y, angle:0, hp:MAX_HP, color, bColor,
     lastShot:0, hitFlash:0,
-    multishot:false, speedBoost:0, rapidfire:0, aimbot:0, activePU:null };
+    multishot:0, speedBoost:0, rapidfire:0, aimbot:0 };
 }
 
 // ─── AI state ─────────────────────────────────────────────────
@@ -353,25 +354,37 @@ function updateUI() {
     p2lbl.innerHTML = '🤖 CPU <span class="ai-tag">AI</span>';
     p2lbl.style.color = '#ef5350';
   } else {
-    p2lbl.textContent = 'P2 — ARROWS + ENTER';
+    p2lbl.textContent = 'P2 — ARROWS / JKLI';
     p2lbl.style.color = '#ef5350';
   }
 
-  document.getElementById('p1-status').textContent = p1.activePU ? ('★ '+puLabel(p1.activePU)) : 'Move: WASD  Shoot: SPACE';
-  document.getElementById('p1-status').style.color = p1.activePU ? puColor(p1.activePU) : '#888';
+  const puStr = pus => pus.length ? '★ '+pus.map(puLabel).join(' + ') : null;
+  const puClr = pus => pus.length ? puColor(pus[pus.length-1]) : null;
+  const p1pus = getActivePUs(p1), p2pus = getActivePUs(p2);
+
+  document.getElementById('p1-status').textContent = puStr(p1pus) || 'Move: WASD  Shoot: SPACE';
+  document.getElementById('p1-status').style.color = puClr(p1pus) || '#888';
 
   if (aiMode) {
-    document.getElementById('p2-status').textContent = p2.activePU ? ('★ '+puLabel(p2.activePU)) : 'Computer controlled';
-    document.getElementById('p2-status').style.color = p2.activePU ? puColor(p2.activePU) : '#546e7a';
+    document.getElementById('p2-status').textContent = puStr(p2pus) || 'Computer controlled';
+    document.getElementById('p2-status').style.color = puClr(p2pus) || '#546e7a';
   } else {
-    document.getElementById('p2-status').textContent = p2.activePU ? ('★ '+puLabel(p2.activePU)) : 'Move: ↑↓←→  Shoot: ENTER';
-    document.getElementById('p2-status').style.color = p2.activePU ? puColor(p2.activePU) : '#888';
+    document.getElementById('p2-status').textContent = puStr(p2pus) || 'Move: ↑↓←→/JKLI  Shoot: ENTER/O';
+    document.getElementById('p2-status').style.color = puClr(p2pus) || '#888';
   }
 }
 
 function puLabel(t){ return {[PU_MULTI]:'MULTI-SHOT',[PU_HP]:'+1 HP',[PU_SPEED]:'SPEED BOOST',[PU_RAPID]:'RAPID FIRE',[PU_AIMBOT]:'AIMBOT'}[t]||''; }
 function puColor(t){ return {[PU_MULTI]:'#ffd54f',[PU_HP]:'#66bb6a',[PU_SPEED]:'#ce93d8',[PU_RAPID]:'#ff8a65',[PU_AIMBOT]:'#ea80fc'}[t]||'#fff'; }
 function puIcon(t) { return {[PU_MULTI]:'✦',[PU_HP]:'♥',[PU_SPEED]:'▶',[PU_RAPID]:'⚡',[PU_AIMBOT]:'◎'}[t]||'★'; }
+function getActivePUs(tank) {
+  const a=[];
+  if(tank.multishot>0)  a.push(PU_MULTI);
+  if(tank.speedBoost>0) a.push(PU_SPEED);
+  if(tank.rapidfire>0)  a.push(PU_RAPID);
+  if(tank.aimbot>0)     a.push(PU_AIMBOT);
+  return a;
+}
 
 // ─── Powerups ─────────────────────────────────────────────────
 function spawnPowerup() {
@@ -383,22 +396,14 @@ function spawnPowerup() {
   }
 }
 
+const MAX_STACK = 1800; // ~30 sec cap so nothing is infinite
 function collectPowerup(tank, pu) {
   spawnExplosion(pu.x, pu.y, puColor(pu.type));
-  if (pu.type===PU_HP) {
-    tank.hp = Math.min(tank.hp+1, MAX_HP+2);
-    tank.activePU = PU_HP;
-    setTimeout(()=>{ if(tank.activePU===PU_HP){tank.activePU=null; updateUI();} }, 1500);
-  } else if (pu.type===PU_MULTI) {
-    tank.multishot=true; tank.activePU=PU_MULTI;
-    setTimeout(()=>{ tank.multishot=false; if(tank.activePU===PU_MULTI){tank.activePU=null;} updateUI(); }, 9000);
-  } else if (pu.type===PU_SPEED) {
-    tank.speedBoost=540; tank.activePU=PU_SPEED;
-  } else if (pu.type===PU_RAPID) {
-    tank.rapidfire=540; tank.activePU=PU_RAPID;
-  } else if (pu.type===PU_AIMBOT) {
-    tank.aimbot=600; tank.activePU=PU_AIMBOT;
-  }
+  if      (pu.type===PU_HP)     { tank.hp = Math.min(tank.hp+1, MAX_HP+2); }
+  else if (pu.type===PU_MULTI)  { tank.multishot  = Math.min((tank.multishot ||0)+540, MAX_STACK); }
+  else if (pu.type===PU_SPEED)  { tank.speedBoost = Math.min((tank.speedBoost||0)+540, MAX_STACK); }
+  else if (pu.type===PU_RAPID)  { tank.rapidfire  = Math.min((tank.rapidfire ||0)+540, MAX_STACK); }
+  else if (pu.type===PU_AIMBOT) { tank.aimbot     = Math.min((tank.aimbot    ||0)+600, MAX_STACK); }
   updateUI();
 }
 
@@ -573,7 +578,8 @@ function updateAI(now) {
 // ─── Input ───────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   keys[e.code]=true;
-  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+      'KeyI','KeyJ','KeyK','KeyL','KeyO'].includes(e.code)) e.preventDefault();
 });
 document.addEventListener('keyup', e => { keys[e.code]=false; });
 
@@ -599,14 +605,14 @@ function tryShoot(tank, now) {
     fireAngle = Math.atan2(enemy.y-tank.y, enemy.x-tank.x);
   }
   const fire = ang => bullets.push({
-    x: tank.x+Math.cos(ang)*(TANK_SIZE+4),
-    y: tank.y+Math.sin(ang)*(TANK_SIZE+4),
+    x: tank.x+Math.cos(ang)*(TANK_SIZE+BULLET_R),
+    y: tank.y+Math.sin(ang)*(TANK_SIZE+BULLET_R),
     vx: Math.cos(ang)*BULLET_SPEED,
     vy: Math.sin(ang)*BULLET_SPEED,
     owner: tank, color: tank.bColor
   });
   fire(fireAngle);
-  if (tank.multishot){ fire(fireAngle-0.22); fire(fireAngle+0.22); }
+  if (tank.multishot>0){ fire(fireAngle-0.22); fire(fireAngle+0.22); }
 }
 
 // ─── Update ───────────────────────────────────────────────────
@@ -630,15 +636,17 @@ function update(now) {
     updateAI(now);
   } else {
     let dx2=0,dy2=0;
-    if(keys['ArrowUp'])dy2-=1; if(keys['ArrowDown'])dy2+=1;
-    if(keys['ArrowLeft'])dx2-=1; if(keys['ArrowRight'])dx2+=1;
+    if(keys['ArrowUp']  ||keys['KeyI'])  dy2-=1;
+    if(keys['ArrowDown'] ||keys['KeyK']) dy2+=1;
+    if(keys['ArrowLeft'] ||keys['KeyJ']) dx2-=1;
+    if(keys['ArrowRight']||keys['KeyL']) dx2+=1;
     if(dx2||dy2){
       const len=Math.sqrt(dx2*dx2+dy2*dy2);
       p2.angle=Math.atan2(dy2,dx2);
       const spd=TANK_SPEED*(p2.speedBoost>0?1.75:1);
       p2.x+=(dx2/len)*spd; p2.y+=(dy2/len)*spd;
     }
-    if(keys['Enter']||keys['NumpadEnter']) tryShoot(p2,now);
+    if(keys['Enter']||keys['NumpadEnter']||keys['KeyO']) tryShoot(p2,now);
   }
 
   const clamp = t=>{
@@ -690,12 +698,13 @@ function update(now) {
 
   if(++puTimer>=PU_INTERVAL){puTimer=0;if(powerups.length<3)spawnPowerup();}
 
-  const tickBuff=(tank,field,puType)=>{
-    if(tank[field]>0){tank[field]--;if(tank[field]===0){if(tank.activePU===puType)tank.activePU=null;updateUI();}}
+  const tickBuff=(tank,field)=>{
+    if(tank[field]>0){tank[field]--;if(tank[field]===0)updateUI();}
   };
-  tickBuff(p1,'speedBoost',PU_SPEED);  tickBuff(p2,'speedBoost',PU_SPEED);
-  tickBuff(p1,'rapidfire', PU_RAPID);  tickBuff(p2,'rapidfire', PU_RAPID);
-  tickBuff(p1,'aimbot',    PU_AIMBOT); tickBuff(p2,'aimbot',    PU_AIMBOT);
+  tickBuff(p1,'multishot');  tickBuff(p2,'multishot');
+  tickBuff(p1,'speedBoost'); tickBuff(p2,'speedBoost');
+  tickBuff(p1,'rapidfire');  tickBuff(p2,'rapidfire');
+  tickBuff(p1,'aimbot');     tickBuff(p2,'aimbot');
 
   for(let i=particles.length-1;i>=0;i--){
     const p=particles[i];
@@ -809,7 +818,7 @@ function draw() {
   for(const pu of powerups) drawPowerup(pu);
   for(const b of bullets){
     ctx.save();ctx.fillStyle=b.color;ctx.shadowColor=b.color;ctx.shadowBlur=8;
-    ctx.beginPath();ctx.arc(b.x,b.y,5,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.beginPath();ctx.arc(b.x,b.y,BULLET_R,0,Math.PI*2);ctx.fill();ctx.restore();
   }
   for(const p of particles){
     ctx.save();ctx.globalAlpha=p.life;ctx.fillStyle=p.color;
