@@ -466,9 +466,6 @@ function resetRound() {
   roundOver = false;
   gameStarted = true;
   resetAI();
-  // Apply cheats — Infinity keeps powerups from ever ticking down
-  if (p1Cheat) { p1.multishot=Infinity; p1.speedBoost=Infinity; p1.rapidfire=Infinity; p1.aimbot=Infinity; }
-  if (p2Cheat) { p2.multishot=Infinity; p2.speedBoost=Infinity; p2.rapidfire=Infinity; p2.aimbot=Infinity; }
   updateUI();
 }
 
@@ -527,11 +524,12 @@ function spawnPowerup() {
 const MAX_STACK = 1800; // ~30 sec cap so nothing is infinite
 function collectPowerup(tank, pu) {
   spawnExplosion(pu.x, pu.y, puColor(pu.type));
+  const keep = (tank===p1 && p1Cheat) || (tank===p2 && p2Cheat); // cheat = never expires
   if      (pu.type===PU_HP)     { tank.hp = Math.min(tank.hp+1, MAX_HP+2); }
-  else if (pu.type===PU_MULTI)  { tank.multishot  = Math.min((tank.multishot ||0)+540, MAX_STACK); }
-  else if (pu.type===PU_SPEED)  { tank.speedBoost = Math.min((tank.speedBoost||0)+540, MAX_STACK); }
-  else if (pu.type===PU_RAPID)  { tank.rapidfire  = Math.min((tank.rapidfire ||0)+540, MAX_STACK); }
-  else if (pu.type===PU_AIMBOT) { tank.aimbot     = Math.min((tank.aimbot    ||0)+600, MAX_STACK); }
+  else if (pu.type===PU_MULTI)  { tank.multishot  = keep ? Infinity : Math.min((tank.multishot ||0)+540, MAX_STACK); }
+  else if (pu.type===PU_SPEED)  { tank.speedBoost = keep ? Infinity : Math.min((tank.speedBoost||0)+540, MAX_STACK); }
+  else if (pu.type===PU_RAPID)  { tank.rapidfire  = keep ? Infinity : Math.min((tank.rapidfire ||0)+540, MAX_STACK); }
+  else if (pu.type===PU_AIMBOT) { tank.aimbot     = keep ? Infinity : Math.min((tank.aimbot    ||0)+600, MAX_STACK); }
   updateUI();
 }
 
