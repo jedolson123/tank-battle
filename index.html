@@ -7,7 +7,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Courier New', monospace; overflow: hidden; }
-  #ui { width: 800px; display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+  #ui { width: 960px; display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
   .player-ui { display: flex; flex-direction: column; gap: 4px; }
   .player-label { font-size: 13px; font-weight: bold; }
   .health-bar-bg { width: 180px; height: 14px; background: #333; border-radius: 7px; overflow: hidden; }
@@ -50,8 +50,8 @@
     background: rgba(255,213,79,.1); }
 
   /* Map cards */
-  .map-grid { display: flex; gap: 14px; }
-  .map-card { width: 200px; cursor: pointer; border: 2px solid #37474f;
+  .map-grid { display: flex; gap: 11px; flex-wrap: wrap; justify-content: center; max-width: 1100px; }
+  .map-card { width: 148px; cursor: pointer; border: 2px solid #37474f;
     border-radius: 10px; overflow: hidden; background: #263238;
     transition: border-color .15s, transform .15s, box-shadow .15s; }
   .map-card:hover { border-color: #ffd54f; transform: translateY(-4px);
@@ -99,7 +99,7 @@
   </div>
 </div>
 
-<canvas id="canvas" width="800" height="540"></canvas>
+<canvas id="canvas" width="960" height="640"></canvas>
 
 <div id="overlay" class="hidden">
   <h1 id="overlay-title"></h1>
@@ -171,7 +171,7 @@ function genRandom() {
   const safe = [{x:60,y:60,r:90},{x:W-60,y:H-60,r:90}];
   const pool  = [SOLID,SOLID,SOLID,SOLID,GLASS,GLASS,HEDGE,HEDGE];
   let tries = 0;
-  while (walls.length < 22 && tries < 600) {
+  while (walls.length < 30 && tries < 800) {
     tries++;
     const wx = Math.floor(Math.random()*((W-80)/WS))*WS + 40;
     const wy = Math.floor(Math.random()*((H-80)/WS))*WS + 40;
@@ -184,47 +184,145 @@ function genRandom() {
 }
 
 function genFortress() {
+  // Central walled fortress cols 9-14, rows 4-11 on a 24×16 grid
   return [
-    mw(7,4),mw(8,4),mw(9,4),mw(10,4),mw(11,4),mw(12,4),
-    mw(7,9),mw(8,9),mw(9,9),mw(10,9),mw(11,9),mw(12,9),
-    mw(7,5),mw(7,6),mw(7,7),mw(7,8),
-    mw(12,5),mw(12,6),mw(12,7),mw(12,8),
-    mw(3,3,HEDGE),mw(3,4,HEDGE),mw(3,5,HEDGE),mw(3,6,HEDGE),
-    mw(3,7,HEDGE),mw(3,8,HEDGE),mw(3,9,HEDGE),mw(3,10,HEDGE),
-    mw(16,3,HEDGE),mw(16,4,HEDGE),mw(16,5,HEDGE),mw(16,6,HEDGE),
-    mw(16,7,HEDGE),mw(16,8,HEDGE),mw(16,9,HEDGE),mw(16,10,HEDGE),
-    mw(5,3,GLASS),mw(5,4,GLASS),mw(5,9,GLASS),mw(5,10,GLASS),
-    mw(14,3,GLASS),mw(14,4,GLASS),mw(14,9,GLASS),mw(14,10,GLASS),
-    mw(1,1),mw(2,1),mw(1,2),
-    mw(17,11),mw(18,11),mw(18,12),
+    mw(9,4),mw(10,4),mw(11,4),mw(12,4),mw(13,4),mw(14,4),
+    mw(9,11),mw(10,11),mw(11,11),mw(12,11),mw(13,11),mw(14,11),
+    mw(9,5),mw(9,6),mw(9,7),mw(9,8),mw(9,9),mw(9,10),
+    mw(14,5),mw(14,6),mw(14,7),mw(14,8),mw(14,9),mw(14,10),
+    // Hedge wings
+    mw(3,3,HEDGE),mw(3,4,HEDGE),mw(3,5,HEDGE),mw(3,6,HEDGE),mw(3,7,HEDGE),
+    mw(3,8,HEDGE),mw(3,9,HEDGE),mw(3,10,HEDGE),mw(3,11,HEDGE),mw(3,12,HEDGE),
+    mw(20,3,HEDGE),mw(20,4,HEDGE),mw(20,5,HEDGE),mw(20,6,HEDGE),mw(20,7,HEDGE),
+    mw(20,8,HEDGE),mw(20,9,HEDGE),mw(20,10,HEDGE),mw(20,11,HEDGE),mw(20,12,HEDGE),
+    // Glass panels
+    mw(6,3,GLASS),mw(6,4,GLASS),mw(6,11,GLASS),mw(6,12,GLASS),
+    mw(17,3,GLASS),mw(17,4,GLASS),mw(17,11,GLASS),mw(17,12,GLASS),
+    // Corner cover (away from spawns)
+    mw(4,1),mw(5,1),mw(4,2),
+    mw(19,13),mw(18,13),mw(19,14),
   ];
 }
 
 function genLabyrinth() {
+  // Winding corridors with glass + hedge on 24×16
   return [
-    mw(2,2),mw(3,2),mw(4,2),mw(5,2),mw(6,2),mw(7,2),
-    mw(13,2),mw(14,2),mw(15,2),mw(16,2),mw(17,2),mw(18,2),
-    mw(2,11),mw(3,11),mw(4,11),mw(5,11),mw(6,11),mw(7,11),
-    mw(13,11),mw(14,11),mw(15,11),mw(16,11),mw(17,11),mw(18,11),
-    mw(9,2,GLASS),mw(9,3,GLASS),mw(9,4,GLASS),mw(9,5,GLASS),
-    mw(10,8,GLASS),mw(10,9,GLASS),mw(10,10,GLASS),mw(10,11,GLASS),
-    mw(4,5,HEDGE),mw(5,5,HEDGE),mw(6,5,HEDGE),mw(7,5,HEDGE),
-    mw(12,8,HEDGE),mw(13,8,HEDGE),mw(14,8,HEDGE),mw(15,8,HEDGE),
-    mw(9,6),mw(10,6),mw(9,7),mw(10,7),
-    mw(1,4),mw(1,9),mw(18,4),mw(18,9),
+    mw(2,2),mw(3,2),mw(4,2),mw(5,2),mw(6,2),mw(7,2),mw(8,2),
+    mw(15,2),mw(16,2),mw(17,2),mw(18,2),mw(19,2),mw(20,2),mw(21,2),
+    mw(2,13),mw(3,13),mw(4,13),mw(5,13),mw(6,13),mw(7,13),mw(8,13),
+    mw(15,13),mw(16,13),mw(17,13),mw(18,13),mw(19,13),mw(20,13),mw(21,13),
+    mw(10,2,GLASS),mw(10,3,GLASS),mw(10,4,GLASS),mw(10,5,GLASS),mw(10,6,GLASS),
+    mw(13,9,GLASS),mw(13,10,GLASS),mw(13,11,GLASS),mw(13,12,GLASS),mw(13,13,GLASS),
+    mw(4,6,HEDGE),mw(5,6,HEDGE),mw(6,6,HEDGE),mw(7,6,HEDGE),mw(8,6,HEDGE),
+    mw(15,9,HEDGE),mw(16,9,HEDGE),mw(17,9,HEDGE),mw(18,9,HEDGE),mw(19,9,HEDGE),
+    mw(11,6),mw(12,6),mw(11,7),mw(12,7),mw(11,8),mw(12,8),
+    mw(1,4),mw(1,11),mw(22,4),mw(22,11),
+  ];
+}
+
+function genCanyon() {
+  // Three horizontal lanes divided by long stone walls with offset gaps
+  const walls = [];
+  // Upper wall — gap at cols 10-12
+  for (let c=3; c<=9;  c++) walls.push(mw(c,5));
+  for (let c=13; c<=20; c++) walls.push(mw(c,5));
+  // Lower wall — gap at cols 11-14 (offset)
+  for (let c=3; c<=10; c++) walls.push(mw(c,10));
+  for (let c=15; c<=20; c++) walls.push(mw(c,10));
+  // Glass pillars in gaps
+  walls.push(mw(10,5,GLASS),mw(11,5,GLASS),mw(12,5,GLASS));
+  walls.push(mw(11,10,GLASS),mw(12,10,GLASS),mw(13,10,GLASS),mw(14,10,GLASS));
+  // Hedge flanks
+  for (let r=3; r<=12; r++) walls.push(mw(1,r,HEDGE));
+  for (let r=3; r<=12; r++) walls.push(mw(22,r,HEDGE));
+  // Corner bumpers
+  walls.push(mw(4,2),mw(5,2),mw(18,13),mw(19,13));
+  return walls;
+}
+
+function genBunkers() {
+  // Four L-shaped bunkers in each quadrant, open toward center
+  return [
+    // Top-left bunker
+    mw(4,3),mw(5,3),mw(6,3), mw(4,4),mw(4,5),
+    // Top-right bunker
+    mw(17,3),mw(18,3),mw(19,3), mw(19,4),mw(19,5),
+    // Bottom-left bunker
+    mw(4,10),mw(4,11), mw(4,12),mw(5,12),mw(6,12),
+    // Bottom-right bunker
+    mw(19,10),mw(19,11), mw(17,12),mw(18,12),mw(19,12),
+    // Center arena
+    mw(10,6),mw(11,6),mw(12,6),mw(13,6),
+    mw(10,9),mw(11,9),mw(12,9),mw(13,9),
+    mw(10,7,GLASS),mw(10,8,GLASS),
+    mw(13,7,GLASS),mw(13,8,GLASS),
+    // Scattered glass
+    mw(7,7,GLASS),mw(7,8,GLASS),mw(16,7,GLASS),mw(16,8,GLASS),
+    // Scattered hedges
+    mw(8,4,HEDGE),mw(15,4,HEDGE),mw(8,11,HEDGE),mw(15,11,HEDGE),
+  ];
+}
+
+function genOpenField() {
+  // Sparse — fast, aggressive play
+  return [
+    // Paired stone blocks
+    mw(5,4),mw(6,4),   mw(17,4),mw(18,4),
+    mw(5,11),mw(6,11), mw(17,11),mw(18,11),
+    // Off-center stones
+    mw(10,3),mw(13,3),
+    mw(10,12),mw(13,12),
+    // Center zigzag
+    mw(11,7),mw(12,7),
+    mw(11,8),mw(12,8),
+    // Glass strips
+    mw(8,6,GLASS),mw(8,7,GLASS),mw(8,8,GLASS),
+    mw(15,6,GLASS),mw(15,7,GLASS),mw(15,8,GLASS),
+    // Hedge strips
+    mw(3,6,HEDGE),mw(3,7,HEDGE),mw(3,8,HEDGE),mw(3,9,HEDGE),
+    mw(20,6,HEDGE),mw(20,7,HEDGE),mw(20,8,HEDGE),mw(20,9,HEDGE),
+    mw(10,5,HEDGE),mw(13,5,HEDGE),mw(10,10,HEDGE),mw(13,10,HEDGE),
+  ];
+}
+
+function genCrossroads() {
+  // Symmetric cross chokepoint in the center
+  return [
+    // Horizontal bar — left half
+    mw(4,7),mw(5,7),mw(6,7),mw(7,7),
+    mw(4,8),mw(5,8),mw(6,8),mw(7,8),
+    // Horizontal bar — right half
+    mw(16,7),mw(17,7),mw(18,7),mw(19,7),
+    mw(16,8),mw(17,8),mw(18,8),mw(19,8),
+    // Vertical bar — top half
+    mw(11,2),mw(12,2),mw(11,3),mw(12,3),mw(11,4),mw(12,4),mw(11,5),mw(12,5),
+    // Vertical bar — bottom half
+    mw(11,10),mw(12,10),mw(11,11),mw(12,11),mw(11,12),mw(12,12),mw(11,13),mw(12,13),
+    // Glass approaches to cross
+    mw(9,7,GLASS),mw(10,7,GLASS),mw(9,8,GLASS),mw(10,8,GLASS),
+    mw(13,7,GLASS),mw(14,7,GLASS),mw(13,8,GLASS),mw(14,8,GLASS),
+    // Hedge corner covers
+    mw(3,3,HEDGE),mw(4,3,HEDGE),mw(3,4,HEDGE),
+    mw(20,3,HEDGE),mw(19,3,HEDGE),mw(20,4,HEDGE),
+    mw(3,12,HEDGE),mw(4,12,HEDGE),mw(3,11,HEDGE),
+    mw(19,12,HEDGE),mw(20,12,HEDGE),mw(20,11,HEDGE),
   ];
 }
 
 const MAPS = [
-  { name:'Random Ruins',  desc:'Mixed stone, glass & hedges', gen:genRandom    },
-  { name:'Fortress',      desc:'Symmetric fort layout',       gen:genFortress  },
-  { name:'Labyrinth',     desc:'Winding glass corridors',     gen:genLabyrinth },
+  { name:'Random Ruins',  desc:'Mixed stone, glass & hedges',       gen:genRandom     },
+  { name:'Fortress',      desc:'Symmetric central fort',             gen:genFortress   },
+  { name:'Labyrinth',     desc:'Winding glass corridors',            gen:genLabyrinth  },
+  { name:'Canyon',        desc:'Three-lane stone corridors',         gen:genCanyon     },
+  { name:'Bunkers',       desc:'Four corner strongholds',            gen:genBunkers    },
+  { name:'Open Field',    desc:'Sparse — all-out fight',             gen:genOpenField  },
+  { name:'Crossroads',    desc:'Symmetric cross chokepoint',         gen:genCrossroads },
 ];
 
 // ─── Preview canvases ─────────────────────────────────────────
 function makePreview(mapDef) {
   const c  = document.createElement('canvas');
-  c.width  = 200; c.height = 115;
+  c.width  = 148; c.height = 99;
   c.style.display = 'block';
   const cx = c.getContext('2d');
   const sx = 200/W, sy = 115/H;
